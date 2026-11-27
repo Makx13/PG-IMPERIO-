@@ -1,0 +1,324 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>P.G: Imperio</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#10061e">
+<meta name="description" content="P.G: Imperio - juego idle de estetica neon.">
+<link rel="icon" type="image/png" href="favicon.png">
+<style>
+  :root {
+    --bg: #10061e;
+    --pink: #ff3d9a;
+    --violet: #a078ff;
+    --violet-d: #7a2cbf;
+    --cyan: #3ce8ff;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; padding: 0; height: 100%; overflow: hidden;
+    background: var(--bg); color: #f1e8ff;
+    font-family: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+
+  /* El juego: ocupa toda la ventana */
+  #canvas {
+    position: fixed; left: 0; top: 0;
+    width: 100vw; height: 100vh;
+    display: block; border: 0; outline: none;
+    background: var(--bg);
+    touch-action: none;
+  }
+
+  /* Capas de fondo synthwave (sol + grilla) usadas en carga y menu */
+  .scene { position: absolute; inset: 0; overflow: hidden;
+    background: linear-gradient(#10061e 0%, #25093f 45%, #3a0d52 58%, #10061e 58.1%); }
+  .sun {
+    position: absolute; left: 50%; top: 58%;
+    width: min(46vw, 46vh); height: min(46vw, 46vh);
+    transform: translate(-50%, -100%);
+    border-radius: 50%;
+    background: linear-gradient(#ffd36e 0%, #ff3d9a 55%, #7a2cbf 100%);
+    box-shadow: 0 0 60px rgba(255, 61, 154, .55), 0 0 140px rgba(160, 120, 255, .35);
+    /* franjas horizontales que se van haciendo mas gruesas hacia abajo */
+    -webkit-mask-image: linear-gradient(#000 0 52%, transparent 52% 55%, #000 55% 66%, transparent 66% 71%, #000 71% 80%, transparent 80% 86%, #000 86% 92%, transparent 92% 100%);
+    mask-image: linear-gradient(#000 0 52%, transparent 52% 55%, #000 55% 66%, transparent 66% 71%, #000 71% 80%, transparent 80% 86%, #000 86% 92%, transparent 92% 100%);
+  }
+  .floor {
+    position: absolute; left: -50%; right: -50%; top: 58%; bottom: -20%;
+    perspective: 380px; perspective-origin: 50% 0;
+    overflow: hidden;
+  }
+  .grid {
+    position: absolute; inset: 0;
+    transform: rotateX(62deg); transform-origin: 50% 0;
+    background-image:
+      linear-gradient(rgba(160, 120, 255, .9) 2px, transparent 2px),
+      linear-gradient(90deg, rgba(255, 61, 154, .8) 2px, transparent 2px);
+    background-size: 64px 64px;
+    animation: grid-move 1.6s linear infinite;
+    box-shadow: inset 0 0 120px 40px #10061e;
+  }
+  @keyframes grid-move { to { background-position: 0 64px, 0 0; } }
+  .floor::after { /* desvanece el horizonte */
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(#10061e 0%, rgba(16, 6, 30, 0) 40%);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .grid { animation: none; }
+    .bar > i { transition: none !important; }
+    .btn { transition: none !important; }
+  }
+
+  /* Overlays */
+  .overlay {
+    position: fixed; inset: 0; z-index: 10;
+    display: flex; align-items: center; justify-content: center;
+    padding: 12px; overflow: auto;
+  }
+  #loading { background: var(--bg); z-index: 20; flex-direction: column; text-align: center; }
+  #loading .box { position: relative; z-index: 1; width: min(88vw, 460px); }
+  #loading h2 {
+    margin: 0 0 18px; font-size: clamp(1.1rem, 4.5vw, 1.6rem); letter-spacing: .25em;
+    color: var(--pink); text-shadow: 0 0 12px rgba(255, 61, 154, .8);
+  }
+  .bar { height: 14px; border-radius: 8px; background: rgba(160, 120, 255, .18);
+    border: 1px solid var(--violet-d); overflow: hidden; box-shadow: 0 0 14px rgba(122, 44, 191, .5); }
+  .bar > i { display: block; height: 100%; width: 0%;
+    background: linear-gradient(90deg, var(--violet-d), var(--pink));
+    box-shadow: 0 0 14px var(--pink); transition: width .2s ease; }
+  #status { margin-top: 12px; min-height: 1.4em; font-size: clamp(.8rem, 3vw, .95rem); color: var(--violet); }
+  #loading.error h2 { color: #ff6b6b; text-shadow: 0 0 12px rgba(255, 80, 80, .7); }
+  #loading.error .bar { display: none; }
+  #loading.error #status { color: #ffb3b3; }
+
+  #menu { background: rgba(16, 6, 30, .55); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    flex-direction: column; text-align: center; display: none; }
+  #menu.show { display: flex; }
+  .panel { width: min(94vw, 640px); margin: auto; padding: clamp(14px, 3vw, 28px); }
+  h1 {
+    margin: 0; font-size: clamp(2rem, 9vw, 4.2rem); letter-spacing: .08em; line-height: 1.05; color: #fff;
+    text-shadow: 0 0 6px #fff, 0 0 16px var(--pink), 0 0 36px var(--pink), 0 0 70px var(--violet-d);
+  }
+  .sub { margin: 10px 0 clamp(14px, 3.5vh, 28px); font-size: clamp(.85rem, 3.2vw, 1.15rem); color: var(--violet);
+    letter-spacing: .12em; text-transform: uppercase; text-shadow: 0 0 10px rgba(160, 120, 255, .6); }
+  .btn {
+    font: inherit; cursor: pointer; color: #fff; border-radius: 12px;
+    transition: transform .12s ease, box-shadow .2s ease, filter .2s ease;
+  }
+  .btn:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+  .play {
+    display: block; margin: 0 auto; width: min(80vw, 320px);
+    padding: clamp(12px, 2.5vh, 18px) 20px; font-size: clamp(1.3rem, 5.5vw, 2rem); font-weight: 800; letter-spacing: .2em;
+    border: 2px solid var(--pink);
+    background: linear-gradient(180deg, rgba(255, 61, 154, .9), rgba(122, 44, 191, .9));
+    box-shadow: 0 0 20px rgba(255, 61, 154, .7), 0 0 50px rgba(255, 61, 154, .35), inset 0 0 14px rgba(255, 255, 255, .25);
+  }
+  .play:hover:not(:disabled) { transform: scale(1.04); box-shadow: 0 0 28px var(--pink), 0 0 70px rgba(255, 61, 154, .5), inset 0 0 14px rgba(255, 255, 255, .3); }
+  .play:active:not(:disabled) { transform: scale(.98); }
+  .play:disabled { opacity: .4; cursor: default; filter: grayscale(.6); box-shadow: none; }
+  .ghost {
+    display: inline-block; margin-top: 14px; padding: 9px 18px; font-size: clamp(.8rem, 3vw, .95rem);
+    background: rgba(16, 6, 30, .6); border: 1px solid var(--violet); color: var(--violet);
+    box-shadow: 0 0 10px rgba(160, 120, 255, .35);
+  }
+  .ghost:hover { color: var(--cyan); border-color: var(--cyan); box-shadow: 0 0 14px rgba(60, 232, 255, .5); }
+  .controls { margin: clamp(14px, 3vh, 26px) auto 0; padding: 0; list-style: none; max-width: 540px;
+    display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 8px; font-size: clamp(.7rem, 2.6vw, .85rem); color: #d9c9ff; }
+  .controls li { padding: 3px 9px; border-radius: 999px; background: rgba(160, 120, 255, .12); border: 1px solid rgba(160, 120, 255, .3); }
+  .controls b { color: var(--cyan); font-weight: 600; }
+  .note { margin: clamp(10px, 2vh, 18px) 0 0; font-size: clamp(.7rem, 2.6vw, .8rem); color: #9d8bc4; }
+
+  /* Boton discreto de pantalla completa (con el menu oculto) */
+  #hud-fs {
+    position: fixed; top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); z-index: 5;
+    width: 34px; height: 34px; padding: 0; display: none; align-items: center; justify-content: center;
+    background: rgba(16, 6, 30, .55); border: 1px solid rgba(160, 120, 255, .5); color: var(--violet);
+    opacity: .45; border-radius: 8px;
+  }
+  #hud-fs.show { display: flex; }
+  #hud-fs:hover, #hud-fs:focus-visible { opacity: 1; color: var(--cyan); border-color: var(--cyan); }
+  #hud-fs svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+  @media (max-height: 520px) {
+    .sub { margin-bottom: 10px; }
+    .controls, .note { display: none; }
+  }
+  noscript { position: fixed; inset: 0; z-index: 30; background: var(--bg); color: #fff; display: flex; align-items: center; justify-content: center; text-align: center; padding: 20px; }
+</style>
+</head>
+<body>
+<canvas id="canvas" tabindex="-1" oncontextmenu="return false;"></canvas>
+
+<div id="loading" class="overlay" role="status" aria-live="polite">
+  <div class="scene"><div class="sun"></div><div class="floor"><div class="grid"></div></div></div>
+  <div class="box">
+    <h2 id="load-title">Cargando...</h2>
+    <div class="bar"><i id="bar"></i></div>
+    <div id="status">Preparando...</div>
+  </div>
+</div>
+
+<div id="menu" class="overlay">
+  <div class="scene" style="opacity:.55"><div class="sun"></div><div class="floor"><div class="grid"></div></div></div>
+  <div class="panel" style="position:relative">
+    <h1>P.G: IMPERIO</h1>
+    <p class="sub">Construí tu imperio neón</p>
+    <button id="play" class="btn play" type="button" disabled>JUGAR</button>
+    <button id="menu-fs" class="btn ghost" type="button">Pantalla completa</button>
+    <ul class="controls">
+      <li><b>Espacio</b> golpe</li>
+      <li><b>1-0</b> comprar</li>
+      <li><b>B</b> cantidad</li>
+      <li><b>M</b> maletín</li>
+      <li><b>L</b> logros</li>
+      <li><b>I</b> idioma</li>
+      <li><b>T</b> temblor</li>
+      <li><b>N</b> música</li>
+      <li><b>↑/↓</b> volumen</li>
+      <li><b>F11</b> pantalla completa</li>
+    </ul>
+    <p class="note">Tu partida se guarda en este navegador</p>
+  </div>
+</div>
+
+<button id="hud-fs" class="btn" type="button" title="Pantalla completa (F11)" aria-label="Pantalla completa">
+  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+</button>
+
+<noscript>Este juego necesita JavaScript activado.</noscript>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var canvas = $('canvas'), loading = $('loading'), menu = $('menu'),
+      bar = $('bar'), statusEl = $('status'), playBtn = $('play'), hud = $('hud-fs');
+  var playing = false, failed = false, ready = false;
+
+  function setProgress(p) { bar.style.width = Math.max(0, Math.min(100, p)) + '%'; }
+
+  function fail(msg) {
+    if (failed) return;
+    failed = true;
+    loading.classList.add('error');
+    loading.style.display = 'flex';
+    $('load-title').textContent = 'Algo salió mal';
+    statusEl.textContent = msg || 'No se pudo cargar el juego. Probá recargar la página.';
+    menu.classList.remove('show');
+    hud.classList.remove('show');
+  }
+
+  function showMenu() {
+    if (failed || ready) return;
+    ready = true;
+    setProgress(100);
+    loading.style.display = 'none';
+    menu.classList.add('show');
+    playBtn.disabled = false;
+    playBtn.focus();
+  }
+
+  // Pantalla completa
+  function isFs() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+  function toggleFs() {
+    var el = document.documentElement;
+    try {
+      if (isFs()) {
+        (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+      } else {
+        var r = (el.requestFullscreen || el.webkitRequestFullscreen).call(el);
+        if (r && r.catch) r.catch(function (e) { console.warn(e); });
+      }
+    } catch (e) { console.warn(e); }
+  }
+  $('menu-fs').addEventListener('click', toggleFs);
+  hud.addEventListener('click', function () { toggleFs(); canvas.focus(); });
+  window.addEventListener('keydown', function (e) {
+    if (e.key === 'F11' || e.keyCode === 122) { e.preventDefault(); toggleFs(); return; }
+    // Evita que el espacio y las flechas scrolleen la pagina
+    if (playing && (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'ArrowDown' ||
+                    e.code === 'ArrowLeft' || e.code === 'ArrowRight')) e.preventDefault();
+  }, { capture: true });
+
+  canvas.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  canvas.addEventListener('webglcontextlost', function (e) { e.preventDefault(); fail('Se perdió el contexto gráfico. Recargá la página.'); });
+
+  // JUGAR: desbloquea el audio (gesto del usuario) y muestra el juego
+  playBtn.addEventListener('click', function () {
+    try { if (Module._pg_unlock_audio) Module._pg_unlock_audio(); } catch (e) { console.warn(e); }
+    playing = true;
+    menu.classList.remove('show');
+    hud.classList.add('show');
+    canvas.focus();
+  });
+  // Al volver a tocar el canvas, que tenga el foco para el teclado
+  canvas.addEventListener('pointerdown', function () { canvas.focus(); });
+
+  // Guardado: la parte C++ hace el syncfs
+  function save() { try { if (Module._pg_save) Module._pg_save(); } catch (e) { console.warn(e); } }
+  window.addEventListener('pagehide', save);
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') save(); });
+
+  window.onerror = function (msg) {
+    console.error(msg);
+    if (!ready) fail('Ocurrió un error al cargar el juego. Probá recargar la página.');
+    else if (/abort|unreachable|memory/i.test(String(msg))) fail('El juego se detuvo por un error. Recargá la página (tu partida está guardada).');
+  };
+  window.addEventListener('unhandledrejection', function (e) { console.warn(e.reason); });
+
+  // ---- Module de Emscripten ----
+  var totalDeps = 0;
+  window.Module = {
+    canvas: canvas,
+    print: function (t) { console.log(t); },
+    printErr: function (t) { console.warn(t); },
+    preRun: [function (mod) {
+      // Persistencia: IDBFS en /persist, el arranque espera a que cargue
+      var M = mod || window.Module;
+      var fs = M.FS || window.FS;
+      var idb = M.IDBFS || (typeof IDBFS !== 'undefined' ? IDBFS : (fs.filesystems && fs.filesystems.IDBFS));
+      var add = M.addRunDependency || window.addRunDependency;
+      var rem = M.removeRunDependency || window.removeRunDependency;
+      try {
+        fs.mkdir('/persist');
+        fs.mount(idb, {}, '/persist');
+        add('pg-idbfs');
+        fs.syncfs(true, function (e) { if (e) console.warn(e); rem('pg-idbfs'); });
+      } catch (e) {
+        console.warn('IDBFS no disponible, la partida no se va a guardar', e);
+      }
+    }],
+    postRun: [function () { showMenu(); }],
+    onRuntimeInitialized: function () { showMenu(); },
+    onAbort: function (what) { console.error(what); fail('El juego se detuvo por un error. Recargá la página.'); },
+    setStatus: function (text) {
+      if (failed || ready) return;
+      var m = /([^(]+)\((\d+(?:\.\d+)?)\/(\d+)\)/.exec(text);
+      if (m) {
+        setProgress(100 * parseFloat(m[2]) / parseFloat(m[3]));
+        statusEl.textContent = 'Cargando... ' + Math.round(100 * parseFloat(m[2]) / parseFloat(m[3])) + '%';
+      } else if (text) {
+        statusEl.textContent = 'Cargando...';
+      }
+    },
+    monitorRunDependencies: function (left) {
+      totalDeps = Math.max(totalDeps, left);
+      if (failed || ready) return;
+      if (left) {
+        // Progreso aproximado por dependencias pendientes (descarga de .data / lectura de la partida)
+        if (totalDeps > 0 && !/\d%/.test(statusEl.textContent)) setProgress(100 * (totalDeps - left) / totalDeps);
+        statusEl.textContent = 'Cargando... (' + (totalDeps - left) + '/' + totalDeps + ')';
+      } else {
+        statusEl.textContent = 'Iniciando...';
+      }
+    }
+  };
+  Module.setStatus('Descargando...');
+})();
+</script>
+{{{ SCRIPT }}}
+</body>
+</html>
