@@ -125,9 +125,9 @@ No se probó con esta compilación; es el mecanismo documentado de Emscripten.
 - La partida es por navegador y por origen (dominio + protocolo + puerto). Borrar los datos del sitio la elimina.
 - No se recomienda escribir ese registro desde la página: un formato incorrecto hace que el juego aparte la partida como `.bad` y empiece de cero.
 
-## 8. Elementos de la plantilla (`plantilla/shell.html`)
+## 8. Elementos de la página (`juego/index.html`)
 
-Si se rediseña a partir de la plantilla, el script usa estos ids. Se pueden cambiar, pero entonces hay que cambiar también el script:
+El archivo `juego/arranque.js` usa estos ids. Se pueden cambiar, pero entonces hay que cambiar también el script:
 
 | id | Elemento |
 |---|---|
@@ -136,7 +136,7 @@ Si se rediseña a partir de la plantilla, el script usa estos ids. Se pueden cam
 | `menu`, `play`, `menu-fs` | Menú de inicio, botón JUGAR y botón de pantalla completa del menú. |
 | `hud-fs` | Botón de pantalla completa que queda en una esquina mientras se juega. |
 
-`{{{ SCRIPT }}}` (al final de la plantilla) es donde el compilador inserta la carga de `index.js`. Solo tiene sentido si se recompila con Emscripten. Para editar la página a mano, partir de `juego/index.html` o reemplazar esa marca por `<script async src="index.js"></script>`.
+En el paquete servido, `arranque.js` se ejecuta antes de `index.js` para preparar `window.Module`. La marca `{{{ SCRIPT }}}` de `plantilla/shell.html` queda reservada para la compilación con Emscripten.
 
 ## 9. Agregar funciones nuevas (requiere el código fuente)
 

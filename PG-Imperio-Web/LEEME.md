@@ -7,7 +7,7 @@ Juego incremental (idle/clicker) de estética synthwave, escrito en C++17 con ra
 | Carpeta / archivo | Qué es |
 |---|---|
 | `juego/` | **La versión web compilada, lista para subir.** Es un sitio estático: no necesita servidor de aplicaciones ni base de datos. |
-| `plantilla/shell.html` | Código fuente legible de la página del juego (`juego/index.html` es esta plantilla ya minificada por el compilador). Es el punto de partida para rediseñarla. |
+| `plantilla/shell.html` | Copia de la plantilla de compilación de Emscripten. Para editar este paquete web, usá los archivos de `juego/`. |
 | `API_JAVASCRIPT.md` | Cómo se comunica la página con el juego: funciones disponibles, eventos de carga, guardado, audio, pantalla completa, tamaño del canvas, cómo incrustarlo. |
 | `docs/` | Documentación del proyecto: `README.md` (general y compilación), `ARCHITECTURE.md` (código), `GAME_DESIGN.md` (mecánicas y economía), `CHANGELOG.md`, `ROADMAP.md` (pendientes). Son copias exactas de las del repositorio. Las rutas que mencionan (`src/`, `web/`, `tests/`, `CLAUDE.md`, `AGENTS.md`, `steam/STEAM.md`) son del repositorio y no vienen en este paquete. |
 | `recursos/logo/` | `icon.png` (512x512, ícono/logo cuadrado), `icon.ico` (ícono de Windows), `library_logo.png` (1280x720, logotipo con fondo transparente). |
@@ -18,7 +18,9 @@ Juego incremental (idle/clicker) de estética synthwave, escrito en C++17 con ra
 
 | Archivo | Tamaño aprox. | Función |
 |---|---|---|
-| `index.html` | 11 KB | Página: canvas, pantalla de carga, menú de inicio, botón de pantalla completa. |
+| `index.html` | — | Estructura de la página: canvas, carga, menú y controles. |
+| `estilos.css` | — | Apariencia de la página y diseño adaptable. |
+| `arranque.js` | — | Configura `Module` antes de cargar `index.js` y maneja menú, audio, pantalla completa y guardado. |
 | `index.js` | 170 KB | Código de arranque de Emscripten (carga el `.wasm` y el `.data`). |
 | `index.wasm` | 350 KB | El juego compilado. |
 | `index.data` | 320 KB | Archivos empaquetados (las fuentes que usa el juego dentro del canvas). |
@@ -65,9 +67,9 @@ Recomendaciones del servidor:
 
 ## Modificar el juego (no solo la página)
 
-Este paquete no incluye el código C++. Para cambiar la plantilla de forma permanente o el juego en sí hay que trabajar sobre el repositorio del proyecto: la plantilla original está en `web/shell.html` y se compila con `web\build_web.ps1` (requisitos en `docs/README.md`). Un `index.html` editado a mano en `juego/` también funciona, siempre que respete lo descrito en `API_JAVASCRIPT.md`.
+Para cambiar el juego en sí, trabajá sobre el repositorio C++ y compilá con `web\build_web.ps1` (ver [docs/README.md](docs/README.md)). Para incorporar al repositorio los cambios de la página, sincronizá el HTML, el CSS y el JavaScript con `web/shell.html` y conservá la marca de Emscripten. Si llevás los archivos CSS y JS por separado, el proceso de compilación también debe copiarlos a la salida. Para actualizar solo el motor de este paquete, revisá la compatibilidad de la API y traé `index.js`, `index.wasm` e `index.data` juntos desde la misma compilación.
 
-## Verificado antes de armar este paquete
+## Pruebas históricas del paquete original
 
 Se sirvió la carpeta `juego/` tal cual está en este paquete y se probó en Chrome (modo sin ventana, render por software):
 carga y menú · sin audio antes de JUGAR y audio activo después · teclado y clics · la página no se desplaza con Espacio/flechas · guardado en IndexedDB (216 bytes) y partida recuperada al recargar · `Module._pg_save()` · `Module.pauseMainLoop()` / `resumeMainLoop()` · el canvas sigue el tamaño de la ventana · funcionamiento dentro de un `<iframe>` de 800x450 · idioma forzado con `Module.arguments` · sin errores en la consola.
